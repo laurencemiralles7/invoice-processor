@@ -16,7 +16,10 @@ import os
 import json
 import gspread
 from datetime import date
-from config import STORES, PL_COL_COG, PL_DATA_START_ROW
+from config import (
+    STORES, PL_COL_COG, PL_COL_REVENUE, PL_COL_ADSPEND,
+    PL_COL_MEDIABUYING, PL_DATA_START_ROW,
+)
 
 CREDENTIALS_FILE  = os.path.join(os.path.dirname(__file__), "credentials.json")
 SERVICE_ACCT_FILE = os.path.join(os.path.dirname(__file__), "service_account.json")
@@ -187,5 +190,100 @@ def write_cog_to_pl(invoice_data, store_key, dry_run=False):
                 "tab": tab_name,
                 "status": f"OK — wrote ${cog_value:.2f} to {tab_name} row {row_num}",
             })
+
+    return results
+
+
+def write_pl_row(invoice_data, store_key, manual_inputs, dry_run=False):
+    """
+    Write COG (from invoice) + Revenue, Adspend, Mediabuying (from manual_inputs)
+    into the P&L sheet. Never overwrites existing non-zero values.
+
+    manual_inputs: { date: { revenue, adspend, mediabuying } }
+    """
+    store = STORES.get(store_key)
+    if not store:
+        raise ValueError(f"Unknown store key: {store_key}")
+
+    pl_sheet_id = store.get("pl_sheet_id")
+    if not pl_sheet_id:
+        raise ValueError(f"No P&L sheet ID configured for store '{store_key}'.")
+
+    gc = _get_client()
+    spreadsheet = gc.open_by_key(pl_sheet_id)
+    results = []
+
+    FIELDS = [
+        ("cog",         PL_COL_COG         + 1, "COG"),
+        ("revenue",     PL_COL_REVENUE     + 1, "Revenue"),
+        ("adspend",     PL_COL_ADSPEND     + 1, "Adspend"),
+        ("mediabuying", PL_COL_MEDIABUYING + 1, "Mediabuying"),
+    ]
+
+    for target_date, cog_value in sorted(invoice_data["daily_totals"].items()):
+        tab_candidates = _month_tab_name(target_date)
+
+        worksheet = None
+        tab_name = None
+        for candidate in tab_candidates:
+            try:
+                worksheet = spreadsheet.worksheet(candidate)
+                tab_name = candidate
+                break
+            except gspread.WorksheetNotFound:
+                continue
+
+        if worksheet is None:
+            results.append({
+                "date": target_date,
+                "status": f"ERROR — no tab found for {target_date.strftime('%B')} in sheet",
+            })
+            continue
+
+        row_num = _find_date_row(worksheet, target_date)
+        if row_num is None:
+            results.append({
+                "date": target_date,
+                "status": f"ERROR — date {target_date} not found in {tab_name} tab",
+            })
+            continue
+
+        # Build values dict: COG from invoice, rest from manual inputs
+        inputs = manual_inputs.get(target_date, {})
+        values = {
+            "cog":         cog_value,
+            "revenue":     inputs.get("revenue"),
+            "adspend":     inputs.get("adspend"),
+            "mediabuying": inputs.get("mediabuying"),
+        }
+
+        written = []
+        skipped = []
+
+        for field_key, col_num, label in FIELDS:
+            val = values.get(field_key)
+            if val is None:
+                continue  # not provided — skip silently
+
+            existing = worksheet.cell(row_num, col_num).value
+            if _cell_has_value(existing):
+                skipped.append(f"{label}({existing})")
+                continue
+
+            if not dry_run:
+                worksheet.update_cell(row_num, col_num, round(float(val), 2))
+            written.append(f"{label}=${val:.2f}")
+
+        parts = []
+        if written:
+            action = "DRY RUN would write" if dry_run else "OK wrote"
+            parts.append(f"{action}: {', '.join(written)} → {tab_name} row {row_num}")
+        if skipped:
+            parts.append(f"SKIPPED (existing): {', '.join(skipped)}")
+
+        results.append({
+            "date": target_date,
+            "status": " | ".join(parts) if parts else f"Nothing to write for {target_date}",
+        })
 
     return results

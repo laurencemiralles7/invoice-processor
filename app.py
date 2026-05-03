@@ -271,37 +271,59 @@ if not pl_sheet_id:
         "Add the sheet ID to `config.py` to enable this."
     )
 else:
-    st.markdown("**This will write the following COG values into the P&L sheet:**")
-    for d, total in sorted(daily.items()):
-        month = d.strftime("%B").upper()
-        st.markdown(f"- `{month}` tab → row **{d}** → COG = **${total:.2f}**")
+    st.markdown(
+        "COG is calculated from the invoice. "
+        "Fill in **Revenue, Adspend Google, and Mediabuying** for each date below."
+    )
+    st.caption("Leave a field blank to skip writing that value for that date.")
 
-    def _run_pl_write(invoice_data, store_key, dry_run):
-        from pl_writer import write_cog_to_pl
+    # ── Manual inputs per date ──────────────────────────────────────────────
+    manual_inputs = {}
+    header_cols = st.columns([2, 2, 2, 2, 2])
+    header_cols[0].markdown("**Date**")
+    header_cols[1].markdown("**COG** *(from invoice)*")
+    header_cols[2].markdown("**Revenue**")
+    header_cols[3].markdown("**Adspend Google**")
+    header_cols[4].markdown("**Mediabuying**")
+
+    for d, cog in sorted(daily.items()):
+        row_cols = st.columns([2, 2, 2, 2, 2])
+        row_cols[0].markdown(f"**{d}**")
+        row_cols[1].markdown(f"`${cog:,.2f}`")
+        revenue     = row_cols[2].number_input("", min_value=0.0, step=0.01, key=f"rev_{d}",    label_visibility="collapsed")
+        adspend     = row_cols[3].number_input("", min_value=0.0, step=0.01, key=f"ads_{d}",    label_visibility="collapsed")
+        mediabuying = row_cols[4].number_input("", min_value=0.0, step=0.01, key=f"media_{d}",  label_visibility="collapsed")
+        manual_inputs[d] = {
+            "revenue":     revenue     if revenue     > 0 else None,
+            "adspend":     adspend     if adspend     > 0 else None,
+            "mediabuying": mediabuying if mediabuying > 0 else None,
+        }
+
+    st.divider()
+
+    def _run_pl_write(invoice_data, store_key, manual_inputs, dry_run):
+        from pl_writer import write_pl_row
         mode = "DRY RUN" if dry_run else "LIVE"
         with st.spinner(f"Writing to P&L [{mode}]..."):
             try:
-                results = write_cog_to_pl(invoice_data, store_key, dry_run=dry_run)
+                results = write_pl_row(invoice_data, store_key, manual_inputs, dry_run=dry_run)
                 for r in results:
-                    ok = r["status"].startswith("OK") or r["status"].startswith("DRY")
-                    if ok:
-                        st.success(f"{r['date']} → ${r['cog']:.2f} | {r['status']}")
+                    status = r["status"]
+                    if status.startswith("OK") or status.startswith("DRY"):
+                        st.success(f"{r['date']} | {status}")
+                    elif status.startswith("SKIPPED"):
+                        st.warning(f"{r['date']} | {status}")
                     else:
-                        elif r["status"].startswith("SKIPPED"):
-                            st.warning(f"{r['date']} | {r['status']}")
-                        else:
-                            st.error(f"{r['date']} | {r['status']}")
+                        st.error(f"{r['date']} | {status}")
             except FileNotFoundError as e:
                 st.error(str(e))
             except Exception as e:
                 st.error(f"Error writing to sheet: {e}")
 
     col_dry, col_live = st.columns([1, 1])
-
     with col_dry:
         if st.button("🔍 Dry Run (preview only)", use_container_width=True):
-            _run_pl_write(invoice_data, store_key, dry_run=True)
-
+            _run_pl_write(invoice_data, store_key, manual_inputs, dry_run=True)
     with col_live:
         if st.button("✅ Write to P&L Sheet", type="primary", use_container_width=True):
-            _run_pl_write(invoice_data, store_key, dry_run=False)
+            _run_pl_write(invoice_data, store_key, manual_inputs, dry_run=False)

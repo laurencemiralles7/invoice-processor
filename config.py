@@ -62,13 +62,14 @@ MARGIN_GREEN_MAX = 2.0
 MARGIN_ORANGE_MAX = 2.5
 
 # P&L column positions (0-indexed from col A)
-PL_COL_DATE = 0       # A
-PL_COL_REVENUE = 1    # B
-PL_COL_COG = 2        # C
-PL_COL_ADSPEND = 3    # D
-PL_COL_REFUNDS = 13   # N
-PL_HEADER_ROW = 6     # row 6 (1-indexed) = headers
-PL_DATA_START_ROW = 7 # row 7 (1-indexed) = first data row
+PL_COL_DATE        = 0   # A
+PL_COL_REVENUE     = 1   # B
+PL_COL_COG         = 2   # C
+PL_COL_ADSPEND     = 3   # D
+PL_COL_MEDIABUYING = 4   # E
+PL_COL_REFUNDS     = 13  # N
+PL_HEADER_ROW      = 6   # row 6 (1-indexed) = headers
+PL_DATA_START_ROW  = 7   # row 7 (1-indexed) = first data row
 
 # Invoice column names — DayOne format
 DAYONE_COLS = {
