@@ -61,8 +61,10 @@ def _get_client():
 
 
 def _month_tab_name(target_date):
-    # Tabs are named APR, MAY, JUN etc. (3-letter abbreviation, uppercase)
-    return target_date.strftime("%b").upper()
+    # Returns both possible tab name formats to try in order
+    short = target_date.strftime("%b").upper()   # APR, MAY, JUN
+    full  = target_date.strftime("%B").upper()   # APRIL, MAY, JUNE
+    return [short, full]
 
 
 def _parse_sheet_date(val):
@@ -114,15 +116,23 @@ def write_cog_to_pl(invoice_data, store_key, dry_run=False):
     results = []
 
     for target_date, cog_value in sorted(invoice_data["daily_totals"].items()):
-        tab_name = _month_tab_name(target_date)
+        tab_candidates = _month_tab_name(target_date)
 
-        try:
-            worksheet = spreadsheet.worksheet(tab_name)
-        except gspread.WorksheetNotFound:
+        worksheet = None
+        tab_name = None
+        for candidate in tab_candidates:
+            try:
+                worksheet = spreadsheet.worksheet(candidate)
+                tab_name = candidate
+                break
+            except gspread.WorksheetNotFound:
+                continue
+
+        if worksheet is None:
             results.append({
                 "date": target_date, "cog": cog_value, "row": None,
-                "tab": tab_name,
-                "status": f"ERROR — tab '{tab_name}' not found in sheet",
+                "tab": str(tab_candidates),
+                "status": f"ERROR — no tab found for {target_date.strftime('%B')} in sheet",
             })
             continue
 
