@@ -276,6 +276,23 @@ else:
         month = d.strftime("%B").upper()
         st.markdown(f"- `{month}` tab → row **{d}** → COG = **${total:.2f}**")
 
+    def _run_pl_write(invoice_data, store_key, dry_run):
+        from pl_writer import write_cog_to_pl
+        mode = "DRY RUN" if dry_run else "LIVE"
+        with st.spinner(f"Writing to P&L [{mode}]..."):
+            try:
+                results = write_cog_to_pl(invoice_data, store_key, dry_run=dry_run)
+                for r in results:
+                    ok = r["status"].startswith("OK") or r["status"].startswith("DRY")
+                    if ok:
+                        st.success(f"{r['date']} → ${r['cog']:.2f} | {r['status']}")
+                    else:
+                        st.error(f"{r['date']} | {r['status']}")
+            except FileNotFoundError as e:
+                st.error(str(e))
+            except Exception as e:
+                st.error(f"Error writing to sheet: {e}")
+
     col_dry, col_live = st.columns([1, 1])
 
     with col_dry:
@@ -285,21 +302,3 @@ else:
     with col_live:
         if st.button("✅ Write to P&L Sheet", type="primary", use_container_width=True):
             _run_pl_write(invoice_data, store_key, dry_run=False)
-
-
-def _run_pl_write(invoice_data, store_key, dry_run):
-    from pl_writer import write_cog_to_pl
-    mode = "DRY RUN" if dry_run else "LIVE"
-    with st.spinner(f"Writing to P&L [{mode}]..."):
-        try:
-            results = write_cog_to_pl(invoice_data, store_key, dry_run=dry_run)
-            for r in results:
-                ok = r["status"].startswith("OK") or r["status"].startswith("DRY")
-                if ok:
-                    st.success(f"{r['date']} → ${r['cog']:.2f} | {r['status']}")
-                else:
-                    st.error(f"{r['date']} | {r['status']}")
-        except FileNotFoundError as e:
-            st.error(str(e))
-        except Exception as e:
-            st.error(f"Error writing to sheet: {e}")
