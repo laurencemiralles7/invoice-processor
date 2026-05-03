@@ -3,11 +3,21 @@
 
 MARGIN_SHEET_ID = "1QC-3drquZtl_Qn0U3HOPjWOA9JMOnJtasDLv5KUf-3o"
 
+REFUND_SHEET_ID  = "1gi5a0YMylYnTJ1vAbM-_YI3j00hL8bAhzfKtZP4sg_Q"
+REFUND_SHEET_GID = "382846829"
+
+# Order name suffix per store — used to cross-check refund sheet
+STORE_SUFFIXES = {
+    "frugaze": "FRU",
+    "luuza":   "LUU",
+    "bimbloo": "BIM",
+}
+
 STORES = {
     "frugaze": {
         "name": "Frugaze",
         "margin_tab": "FRUGAZE",
-        "pl_sheet_id": "1PgZdavlPBss7O219hEUSSY9gPfrm5bGxbLhh96l95DI",
+        "pl_sheet_id": "1bG66QA4WiKrHWJr9lJHmAz3pfnrZUDqJRLiKixM4wb0",
         "pl_tab_prefix": "",
         "currency": "USD",
     },

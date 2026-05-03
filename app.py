@@ -7,6 +7,7 @@ from pathlib import Path
 from invoice_parser import load_invoice
 from margin_checker import check_margins, _fetch_margin_sheet
 from report_generator import generate_xlsx, generate_cassy_message, generate_pl_summary
+from refund_checker import check_refunds
 from config import STORES
 
 st.set_page_config(
@@ -72,12 +73,27 @@ store_config = STORES.get(store_key, {})
 store_name = store_config.get("name", store_key.title())
 margin_tab = store_config.get("margin_tab")
 
+# ── Refund cross-check ─────────────────────────────────────────────────────────
+with st.spinner("Cross-checking refund sheet..."):
+    try:
+        invoice_data = check_refunds(invoice_data)
+        refund_check_ok = True
+    except Exception as e:
+        st.warning(f"Refund sheet check failed: {e}. Continuing without refund data.")
+        invoice_data["refund_check_results"] = []
+        invoice_data["refund_deductions"] = {}
+        invoice_data["daily_totals_original"] = invoice_data["daily_totals"]
+        refund_check_ok = False
+
 # ── Summary bar ────────────────────────────────────────────────────────────────
+cancelled_in_invoice = [
+    r for r in invoice_data.get("refund_check_results", []) if r["in_invoice"]
+]
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("Store", store_name)
 col2.metric("Total rows", len(invoice_data["rows"]))
-col3.metric("Refunds", len(invoice_data["refund_rows"]))
-col4.metric("Grand total", f"${invoice_data['grand_total']:,.2f}")
+col3.metric("Cancelled (in invoice)", len(cancelled_in_invoice))
+col4.metric("Grand total (adj.)", f"${invoice_data['grand_total']:,.2f}")
 
 st.divider()
 
@@ -109,9 +125,45 @@ st.divider()
 st.subheader("Daily Totals (COG)")
 
 daily = invoice_data["daily_totals"]
+daily_orig = invoice_data.get("daily_totals_original", daily)
+deductions = invoice_data.get("refund_deductions", {})
+
 dt_cols = st.columns(len(daily))
 for i, (d, total) in enumerate(sorted(daily.items())):
-    dt_cols[i].metric(str(d), f"${total:,.2f}")
+    orig = daily_orig.get(d, total)
+    delta = total - orig  # negative if deduction was applied
+    if delta < 0:
+        dt_cols[i].metric(str(d), f"${total:,.2f}", delta=f"${delta:,.2f} (cancelled deducted)", delta_color="off")
+    else:
+        dt_cols[i].metric(str(d), f"${total:,.2f}")
+
+# ── Refund cross-check results ─────────────────────────────────────────────────
+refund_results = invoice_data.get("refund_check_results", [])
+if refund_results:
+    st.divider()
+    st.subheader("Refund Sheet Cross-Check")
+
+    found_in_invoice = [r for r in refund_results if r["in_invoice"]]
+    not_in_invoice   = [r for r in refund_results if not r["in_invoice"]]
+
+    if found_in_invoice:
+        st.error(
+            f"**{len(found_in_invoice)} cancelled order(s) found in invoice** — "
+            "deducted from COG totals above."
+        )
+        for r in found_in_invoice:
+            st.markdown(
+                f"- `{r['order_num']}` | {r['product']} | "
+                f"Reason: **{r['reason']}** | "
+                f"Deducted **${r['deducted']:.2f}** from {r['order_date']} COG"
+            )
+    else:
+        st.success("No cancelled orders found in this invoice — supplier excluded them all correctly.")
+
+    if not_in_invoice:
+        with st.expander(f"{len(not_in_invoice)} refund sheet entries not in this invoice (already excluded)"):
+            for r in not_in_invoice:
+                st.markdown(f"- `{r['order_num']}` | {r['product']} | {r['reason']}")
 
 st.divider()
 

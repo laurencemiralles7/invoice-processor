@@ -125,7 +125,7 @@ def load_invoice(filepath):
             "discount": discount,
             "in_total": float(in_total),
             "title": get(raw, "title"),
-            "is_refund": float(in_total) == 0.0,
+            "is_refund": float(in_total) < 0,
         }
         rows.append(row)
 
