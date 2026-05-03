@@ -61,12 +61,14 @@ def _get_client():
 
 
 def _month_tab_name(target_date):
-    return target_date.strftime("%B").upper()
+    # Tabs are named APR, MAY, JUN etc. (3-letter abbreviation, uppercase)
+    return target_date.strftime("%b").upper()
 
 
 def _parse_sheet_date(val):
     from datetime import datetime
-    formats = ["%m/%d/%Y", "%Y-%m-%d", "%d/%m/%Y", "%m/%d/%y", "%Y/%m/%d"]
+    # Includes DD.MM.YYYY format used in the P&L sheets
+    formats = ["%d.%m.%Y", "%d.%m.%y", "%m/%d/%Y", "%Y-%m-%d", "%d/%m/%Y", "%m/%d/%y"]
     val = str(val).strip()
     for fmt in formats:
         try:
@@ -85,7 +87,8 @@ def _find_date_row(worksheet, target_date):
         if not val:
             continue
         parsed = _parse_sheet_date(val)
-        if parsed and parsed == target_date:
+        # Match by month and day only — P&L sheet may show a different year
+        if parsed and parsed.month == target_date.month and parsed.day == target_date.day:
             return row_num
     return None
 
