@@ -290,13 +290,21 @@ else:
         row_cols = st.columns([2, 2, 2, 2, 2])
         row_cols[0].markdown(f"**{d}**")
         row_cols[1].markdown(f"`${cog:,.2f}`")
-        revenue     = row_cols[2].number_input("", min_value=0.0, step=0.01, key=f"rev_{d}",    label_visibility="collapsed")
-        adspend     = row_cols[3].number_input("", min_value=0.0, step=0.01, key=f"ads_{d}",    label_visibility="collapsed")
-        mediabuying = row_cols[4].number_input("", min_value=0.0, step=0.01, key=f"media_{d}",  label_visibility="collapsed")
+        rev_str   = row_cols[2].text_input("", placeholder="e.g. 2769.95", key=f"rev_{d}",   label_visibility="collapsed")
+        ads_str   = row_cols[3].text_input("", placeholder="e.g. 1500.00", key=f"ads_{d}",   label_visibility="collapsed")
+        media_str = row_cols[4].text_input("", placeholder="e.g. 200.00",  key=f"media_{d}", label_visibility="collapsed")
+
+        def _parse(s):
+            try:
+                v = float(s.replace(",", ".").strip())
+                return v if v > 0 else None
+            except (ValueError, AttributeError):
+                return None
+
         manual_inputs[d] = {
-            "revenue":     revenue     if revenue     > 0 else None,
-            "adspend":     adspend     if adspend     > 0 else None,
-            "mediabuying": mediabuying if mediabuying > 0 else None,
+            "revenue":     _parse(rev_str),
+            "adspend":     _parse(ads_str),
+            "mediabuying": _parse(media_str),
         }
 
     st.divider()
