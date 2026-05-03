@@ -148,6 +148,16 @@ def write_cog_to_pl(invoice_data, store_key, dry_run=False):
 
         cog_col = PL_COL_COG + 1  # 0-indexed → 1-indexed
 
+        # Check if cell already has a value — never overwrite existing data
+        existing = worksheet.cell(row_num, cog_col).value
+        if existing and str(existing).strip() not in ("", "0", "$0.00", "0.00"):
+            results.append({
+                "date": target_date, "cog": cog_value, "row": row_num,
+                "tab": tab_name,
+                "status": f"SKIPPED — {tab_name} row {row_num} already has value ({existing})",
+            })
+            continue
+
         if dry_run:
             results.append({
                 "date": target_date, "cog": cog_value, "row": row_num,

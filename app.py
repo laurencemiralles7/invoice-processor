@@ -287,7 +287,10 @@ else:
                     if ok:
                         st.success(f"{r['date']} → ${r['cog']:.2f} | {r['status']}")
                     else:
-                        st.error(f"{r['date']} | {r['status']}")
+                        elif r["status"].startswith("SKIPPED"):
+                            st.warning(f"{r['date']} | {r['status']}")
+                        else:
+                            st.error(f"{r['date']} | {r['status']}")
             except FileNotFoundError as e:
                 st.error(str(e))
             except Exception as e:
