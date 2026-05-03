@@ -95,6 +95,22 @@ def _find_date_row(worksheet, target_date):
     return None
 
 
+def _cell_has_value(val):
+    """Return True if a cell contains a meaningful non-zero value."""
+    if val is None:
+        return False
+    s = str(val).strip()
+    if not s:
+        return False
+    # Strip currency symbol and normalize European format (1.362,70 → 1362.70)
+    s = s.replace("$", "").replace(" ", "")
+    s = s.replace(".", "").replace(",", ".")  # remove thousands sep, fix decimal
+    try:
+        return float(s) != 0.0
+    except ValueError:
+        return False
+
+
 def write_cog_to_pl(invoice_data, store_key, dry_run=False):
     """
     Write daily COG totals into the P&L Google Sheet.
@@ -150,7 +166,7 @@ def write_cog_to_pl(invoice_data, store_key, dry_run=False):
 
         # Check if cell already has a value — never overwrite existing data
         existing = worksheet.cell(row_num, cog_col).value
-        if existing and str(existing).strip() not in ("", "0", "$0.00", "0.00"):
+        if _cell_has_value(existing):
             results.append({
                 "date": target_date, "cog": cog_value, "row": row_num,
                 "tab": tab_name,
